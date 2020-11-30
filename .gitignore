@@ -1,0 +1,8 @@
+Pods
+NetworkManager/NetworkManager.xcodeproj/project.xcworkspace/xcuserdata
+NetworkManager/NetworkManager.xcodeproj/xcuserdata/
+NetworkManager/NetworkManager.xcworkspace/xcuserdata
+Carthage/Checkouts/*
+Carthage/Build/Mac/*
+Carthage/Build/tvOS/*
+Carthage/Build/watchOS/*

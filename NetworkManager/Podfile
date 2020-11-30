@@ -1,0 +1,34 @@
+# Variables
+$iOSDeploymentTarget = '10.0'
+
+# Settings
+platform :ios, $iOSDeploymentTarget
+inhibit_all_warnings!
+
+# Common Pods
+def shared_pods
+  pod 'Alamofire'
+  pod 'ObjectMapper'
+end
+
+target 'NetworkManager' do
+  # Comment the next line if you don't want to use dynamic frameworks
+  use_frameworks!
+  
+  shared_pods
+  
+  target 'NetworkManagerTests' do
+      inherit! :search_paths
+      # Pods for testing
+      
+      shared_pods
+    end
+end
+
+post_install do |pi|
+   pi.pods_project.targets.each do |t|
+       t.build_configurations.each do |bc|
+         bc.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = $iOSDeploymentTarget
+       end
+   end
+end
