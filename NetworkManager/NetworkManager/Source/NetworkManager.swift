@@ -9,11 +9,13 @@
 import Alamofire
 import ObjectMapper
 
-public protocol NetworkManagerDelegate: class, RequestAdapter {
+public protocol NetworkManagerDelegate: AnyObject, RequestAdapter {
     func networkManager(_ manager: NetworkManager, requestedToRefreshTokenWithAcceptance acceptance: (Bool) -> Void, completion: @escaping ((Bool, Error?) -> Void))
     func adapt(_ urlRequest: URLRequest, for session: Session, completion: @escaping (Result<URLRequest, Error>) -> Void)
     func canReplaceTokenForRequest(_ request: Request) -> Bool
 }
+
+let networkManager = NetworkManager.shared
 
 open class NetworkManager {
     public static let shared = NetworkManager()
@@ -21,7 +23,7 @@ open class NetworkManager {
     private let sessionManager: Session
     private weak var delegate: NetworkManagerDelegate!
     private var acceptedHTTPCodes = [Int]()
-    private var interceptor = SessionManagerRetrier()
+    private let interceptor = SessionManagerRetrier()
     
     private lazy var defaultHeaders = HTTPHeaders.default
     private lazy var anonymousHeaders = HTTPHeaders.default
@@ -30,15 +32,19 @@ open class NetworkManager {
     private init() {
         let configuration = URLSessionConfiguration.default
         configuration.allowsCellularAccess = true
+        #if DEBUG
+        configuration.timeoutIntervalForRequest = 20
+        #else
         configuration.timeoutIntervalForRequest = 60
+        #endif
         configuration.timeoutIntervalForResource = 120
         configuration.urlCredentialStorage = nil
-		configuration.httpMaximumConnectionsPerHost = 10
-		
+        configuration.httpMaximumConnectionsPerHost = 10
+        
         sessionManager = Session(configuration: configuration, interceptor: interceptor, eventMonitors: [MNNetworkLogger.shared])
         
-        self.acceptedHTTPCodes.append(contentsOf: Array<Int>(200..<300))
-        self.acceptedHTTPCodes.append(contentsOf: [400, 402, 403, 404])
+        acceptedHTTPCodes.append(contentsOf: Array<Int>(200..<300))
+        acceptedHTTPCodes.append(contentsOf: [400, 402, 403, 404])
     }
     
     public func setDelegate(_ delegate: NetworkManagerDelegate) {
@@ -68,20 +74,20 @@ open class NetworkManager {
     public func request(method: HTTPMethod = .get,
                         service: String,
                         parameters: NMParameters? = nil,
-                        headerType: NMHeaderType = NMHeaderType.authorized,
+                        headerType: NMHeaderType = .authorized,
                         encoding: ParameterEncoding = JSONEncoding.default,
                         validate: Bool = true,
-                        completion: @escaping NMResult) -> Request {
+                        completion: @escaping NMResultBlock) -> Request {
         let headers = getHeaderFieldsForType(headerType)
         
         var req = sessionManager.request(service,
-                                              method: method,
-                                              parameters: parameters?.getParametersAsDict(),
-                                              encoding: encoding,
-                                              headers: headers,
-                                              requestModifier: parameters?.modifierForRequest)
+                                         method: method,
+                                         parameters: parameters?.getParametersAsDict(),
+                                         encoding: encoding,
+                                         headers: headers,
+                                         requestModifier: parameters?.modifierForRequest)
         if validate {
-            req = req.validate(statusCode: self.acceptedHTTPCodes)
+            req = req.validate(statusCode: acceptedHTTPCodes)
         }
         var cURL = ""
         req.cURLDescription { [unowned req] _ in
@@ -89,85 +95,113 @@ open class NetworkManager {
         }
         req.responseJSON { [weak self] response in
             req.printLog(for: response, cURL: cURL)
-            self?.handleParseDataResponse(response, completion: completion)
+            self?.parseDataResponse(response, completion: completion)
         }
         
         return req
     }
     
     @discardableResult
-    public func uploadObject(_ object: Any,
-                             to url: URL,
-                             headerType: NMHeaderType = NMHeaderType.default,
-                             encoding: ParameterEncoding = JSONEncoding.default,
-                             body: [String: String]? = nil,
-                             validate: Bool = true,
-                             progression: NMProgressBlock?,
-                             completion: @escaping NMResult) -> Request {
+    public func uploadWith(body: [(String, Any)],
+                           to path: String,
+                           headerType: NMHeaderType = .authorized,
+                           validate: Bool = true,
+                           progression: NMProgressBlock?,
+                           completion: @escaping NMResultBlock) -> Request {
         let headers = self.getHeaderFieldsForType(headerType)
-        
+        var objectUsedToUpload: Any? = nil
         var req = sessionManager.upload(multipartFormData: { formData in
-            if let body = body {
-                for (key, value) in body {
-                    if let data = value.data(using: .utf8) {
+            for (index, item) in body.enumerated() {
+                let (key, value) = item
+                switch value {
+                case let string as String:
+                    if let data = string.data(using: .utf8) {
                         formData.append(data, withName: key)
                     }
+                case let photoURL as URL:
+                    formData.append(photoURL, withName: key)
+                    objectUsedToUpload = photoURL
+                case let image as UIImage:
+                    if let data = image.jpegData(compressionQuality: 0.5) {
+                        formData.append(data, withName: key, fileName: "img_\(index).jpg", mimeType: "image/jpeg")
+                    }
+                    objectUsedToUpload = image
+                default:
+                    break
                 }
             }
-            if let photoURL = object as? URL {
-                formData.append(photoURL, withName: "file")
-            }
-            else if let image = object as? UIImage {
-                if let data = image.jpegData(compressionQuality: 0.5) {
-                    formData.append(data, withName: "file", mimeType: "image/jpeg")
-                }
-            }
-        }, to: url, headers: headers)
+        }, to: path, headers: headers)
         req.uploadProgress(closure: { progress in
-            progression?(progress.fractionCompleted, object)
+            progression?(progress.fractionCompleted, objectUsedToUpload)
         })
         if validate {
-            req = req.validate(statusCode: self.acceptedHTTPCodes)
+            req = req.validate(statusCode: acceptedHTTPCodes)
         }
         var cURL = ""
         req.cURLDescription { [unowned req] _ in
             cURL = req.cURLString()
         }
-        req.responseData(completionHandler: { response in
+        req.responseData(completionHandler: { [weak self] response in
             req.printLog(for: response, cURL: cURL)
             var string = ""
-            if let data = response.data, let str = String(data: data, encoding: .utf8) {
-                string = str
+            if let data = response.data {
+                if let dict = try? JSONSerialization.jsonObject(with: data, options: .allowFragments) {
+                    self?.parseDataResponse(response, dict: dict, completion: completion)
+                    return
+                }
+                else if let str = String(data: data, encoding: .utf8) {
+                    string = str
+                }
             }
-            let resultData = NMResultData(statusCode: response.response?.statusCode ?? 0, string: string)
-            completion(.success(resultData))
+            let result = NMResultData(statusCode: response.response?.statusCode ?? 0, string: string, response: response.response)
+            completion(.success(result))
         })
         
         return req
     }
     
     @discardableResult
-    public func uploadImage(_ image: UIImage,
-                            to url: URL,
-                            headerType: NMHeaderType = NMHeaderType.default,
-                            encoding: ParameterEncoding = JSONEncoding.default,
-                            body: [String: String]? = nil,
-                            validate: Bool = true,
-                            progression: NMProgressBlock?,
-                            completion: @escaping NMResult) -> Request {
-        return self.uploadObject(image, to: url, headerType: headerType, encoding: encoding, body: body, validate: validate, progression: progression, completion: completion)
-    }
-    
-    @discardableResult
-    public func uploadPhotoURL(_ photoURL: URL,
-                               to url: URL,
-                               headerType: NMHeaderType = NMHeaderType.default,
-                               encoding: ParameterEncoding = JSONEncoding.default,
-                               body: [String: String]? = nil,
-                               validate: Bool = true,
-                               progression: NMProgressBlock?,
-                               completion: @escaping NMResult) -> Request {
-        return self.uploadObject(photoURL, to: url, headerType: headerType, encoding: encoding, body: body, validate: validate, progression: progression, completion: completion)
+    public func download(method: HTTPMethod = .get,
+                        service: Alamofire.URLConvertible,
+                        parameters: NMParameters? = nil,
+                        headerType: NMHeaderType = .anonymous,
+                        validate: Bool = false,
+                        progression: NMProgressBlock? = nil,
+                        completion: @escaping NMDownloadResultBlock) -> Request {
+        let headers = getHeaderFieldsForType(headerType)
+        
+        let destination: DownloadRequest.Destination = { (url, response) -> (URL, Alamofire.DownloadRequest.Options) in
+            var fileInTempFolder = FileManager.default.temporaryDirectory
+            fileInTempFolder.appendPathComponent(response.url?.lastPathComponent ?? url.lastPathComponent)
+            return (fileInTempFolder, [.removePreviousFile, .createIntermediateDirectories])
+        }
+        
+        var req = sessionManager.download(service,
+                                         method: method,
+                                         parameters: parameters?.getParametersAsDict(),
+                                         headers: headers,
+                                         requestModifier: parameters?.modifierForRequest,
+                                         to: destination)
+        if validate {
+            req = req.validate(statusCode: acceptedHTTPCodes)
+        }
+        var cURL = ""
+        req.cURLDescription { [unowned req] _ in
+            cURL = req.cURLString()
+        }
+        req.downloadProgress {
+            progression?($0.fractionCompleted, service)
+        }
+        req.responseURL { response in
+            req.printLog(for: response, cURL: cURL)
+            switch response.result {
+            case .success(let url):
+                completion(.success(url))
+            case .failure(let error):
+                completion(.failure(error))
+            }
+        }
+        return req
     }
     
     private func getHeaderFieldsForType(_ headerType: NMHeaderType) -> HTTPHeaders? {
@@ -208,7 +242,7 @@ open class NetworkManager {
         if name.isEmpty {
             name = info?["CFBundleName"] as? String ?? "Unknown"
         }
-        let userAgent = "\(companyName)/\(name)-\(appVersion)"
+        let userAgent = "\(companyName)/\(name)-iOS-\(appVersion)"
         self.defaultHeaders.update(HTTPHeader.userAgent(userAgent))
         self.anonymousHeaders.update(HTTPHeader.userAgent(userAgent))
         self.authorizedHeaders.update(HTTPHeader.userAgent(userAgent))
@@ -216,9 +250,9 @@ open class NetworkManager {
 }
 
 private extension NetworkManager {
-    func handleParseDataResponse(_ response: AFDataResponse<Any>,
-                                 successCode: String = "",
-                                 completion: @escaping NMResult) {
+    func parseDataResponse<T>(_ response: AFDataResponse<T>,
+                              dict: Any? = nil,
+                              completion: @escaping NMResultBlock) {
         var statusCode: Int?
         if let responseValue = response.response {
             statusCode = responseValue.statusCode
@@ -228,71 +262,28 @@ private extension NetworkManager {
         }
         switch response.result {
         case .success(let value):
-            let boundCode = self.parseSuccessCodeMessage(value)
-            if boundCode.isSuccess {
-                let resultData = NMResultData(statusCode: statusCode ?? 0,result: value, data: self.parseData(value))
-                completion(.success(resultData))
+            let context = NMResultDataContext(data: response.data, statusCode: statusCode)
+            let result = Mapper<NMResultData>(context: context).map(JSONObject: dict ?? value)
+            if var result = result {
+                result.response = response.response
+                statusCode = result.statusCode ?? statusCode
+                result.statusCode = result.statusCode ?? statusCode
+                if result.errors == nil && statusCode != nil && statusCode! < 400 && statusCode != 401 {
+                    completion(.success(result))
+                }
+                else {
+                    completion(.failure(result))
+                }
             }
             else {
-                let errors = self.parseErrors(errors: boundCode.errors)
-                let resultData = NMResultData(statusCode: statusCode ?? 0, requestID: boundCode.requestId, errors: errors)
-                completion(.failure(resultData))
+                let failedResult = NMResultData(statusCode: statusCode ?? 0, errors: nil, response: response.response)
+                completion(.failure(failedResult))
             }
-        case .failure(let error as NSError):
-            let resultData = NMResultData(statusCode: statusCode ?? error.code, requestID: "n/a", errors: [NMError(err: error)])
+        case .failure(let error):
+            statusCode = statusCode ?? (error.underlyingError as NSError?)?.code
+            let resultData = NMResultData(statusCode: statusCode ?? 0, errors: [NMError(err: error)], response: response.response)
             completion(.failure(resultData))
         }
-    }
-    
-    func parseSuccessCodeMessage(_ response: Any)
-        -> (isSuccess:Bool, errors: Any?, requestId: String) {
-        var isSuccess: Bool = false
-        var errors: Any? = nil
-        var requestId: String = ""
-        if let dictData = response as? [String : Any] {
-            if let value = dictData["isSuccess"] as? Bool {
-                isSuccess = value
-            } else if let value = dictData["IsSuccess"] as? Bool {
-                isSuccess = value
-            }
-            
-            if let errorsData = dictData["errors"] {
-                errors = errorsData
-            } else if let errorsData = dictData["Errors"] as? String {
-                errors = errorsData
-            }
-            if errors == nil {
-                errors = self.parseData(response)
-            }
-            
-            if let value = dictData["requestId"] as? String {
-                requestId = value
-            } else if let value = dictData["requestID"] as? String {
-                requestId = value
-            }
-        }
-        return (isSuccess, errors, requestId)
-    }
-    
-    func parseData(_ response: Any) -> Any? {
-        if let dictData = response as? [String : Any] {
-            if let data = dictData["data"] {
-                return data
-            } else if let data = dictData["responsData"] {
-                return data
-            }
-        }
-        return nil
-    }
-    
-    func parseErrors(errors: Any?) -> [NMError]? {
-        if let mess = errors as? String {
-            return [NMError(code: "0", message: mess)]
-        }
-//        var data = Data(json.utf8)
-//        let decoder = JSONDecoder()
-//        return try? decoder.decode([NMError].self, from: errors)
-        return nil
     }
 }
 
@@ -324,8 +315,8 @@ private class SessionManagerRetrier: RequestInterceptor {
     
     func retry(_ request: Request, for session: Session, dueTo error: Error, completion: @escaping (RetryResult) -> Void) {
         if (request.task?.response as? HTTPURLResponse)?.statusCode == 401 ||
-                request.response?.statusCode == 401 ||
-                (error as NSError).code == 401 {
+            request.response?.statusCode == 401 ||
+            (error as NSError).code == 401 {
             if self.delegate?.canReplaceTokenForRequest(request) == true {
                 completion(.retryWithDelay(0.1))
             }

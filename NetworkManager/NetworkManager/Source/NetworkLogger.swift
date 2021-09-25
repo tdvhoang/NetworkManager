@@ -8,18 +8,20 @@
 
 import Foundation
 import Alamofire
-import ObjectMapper
 
+private let EnabledLog = true
 open class MNNetworkLogger: EventMonitor {
     public let queue = DispatchQueue(label: "MNNetworkLoggerQueue", qos: .utility)
     
-    public static var shared = MNNetworkLogger()
-    public var prefixString = "[Info]"
+    public static let shared = MNNetworkLogger()
+    public let prefixString = "[Info]"
     
     private init() {}
     
     public func urlSession(_ session: URLSession, didBecomeInvalidWithError error: Error?) {
-        print("\(prefixString) URLSession: \(session), didBecomeInvalidWithError: \(error?.localizedDescription ?? "None")")
+        if EnabledLog {
+            print("\(prefixString) URLSession: \(session), didBecomeInvalidWithError: \(error?.localizedDescription ?? "None")")
+        }
     }
     
 //    public func urlSession(_ session: URLSession, task: URLSessionTask, didReceive challenge: URLAuthenticationChallenge) {
@@ -42,19 +44,23 @@ open class MNNetworkLogger: EventMonitor {
                            task: URLSessionTask,
                            willPerformHTTPRedirection response: HTTPURLResponse,
                            newRequest request: URLRequest) {
-        print("\(prefixString) URLSession: \(session), task: \(task), willPerformHTTPRedirection: \(response), newRequest: \(request)")
+        if EnabledLog {
+            print("\(prefixString) URLSession: \(session), task: \(task), willPerformHTTPRedirection: \(response), newRequest: \(request)")
+        }
     }
     
 //    public func urlSession(_ session: URLSession, task: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics) {
 //        print("\(prefixString) URLSession: \(session), task: \(task), didFinishCollecting: \(metrics)")
 //    }
-    
-    public func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        print("\(prefixString) URLSession: \(session), task: \(task), didCompleteWithError: \(error?.localizedDescription ?? "None")")
-    }
+//
+//    public func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+//        print("\(prefixString) URLSession: \(session), task: \(task), didCompleteWithError: \(error?.localizedDescription ?? "None")")
+//    }
     
     public func urlSession(_ session: URLSession, taskIsWaitingForConnectivity task: URLSessionTask) {
-        print("🥺\(prefixString) URLSession: \(session), taskIsWaitingForConnectivity: \(task)")
+        if EnabledLog {
+            print("🥺\(prefixString) URLSession: \(session), taskIsWaitingForConnectivity: \(task)")
+        }
     }
     
 //    public func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
@@ -71,7 +77,9 @@ open class MNNetworkLogger: EventMonitor {
                            downloadTask: URLSessionDownloadTask,
                            didResumeAtOffset fileOffset: Int64,
                            expectedTotalBytes: Int64) {
-        print("😎\(prefixString) URLSession: \(session), downloadTask: \(downloadTask), didResumeAtOffset: \(fileOffset), expectedTotalBytes: \(expectedTotalBytes)")
+        if EnabledLog {
+            print("😎\(prefixString) URLSession: \(session), downloadTask: \(downloadTask), didResumeAtOffset: \(fileOffset), expectedTotalBytes: \(expectedTotalBytes)")
+        }
     }
     
 //    public func urlSession(_ session: URLSession,
@@ -85,25 +93,31 @@ open class MNNetworkLogger: EventMonitor {
     public func urlSession(_ session: URLSession,
                            downloadTask: URLSessionDownloadTask,
                            didFinishDownloadingTo location: URL) {
-        print("🥳\(prefixString) URLSession: \(session), downloadTask: \(downloadTask), didFinishDownloadingTo: \(location)")
+        if EnabledLog {
+            print("🥳\(prefixString) URLSession: \(session), downloadTask: \(downloadTask), didFinishDownloadingTo: \(location)")
+        }
     }
     
-    public func request(_ request: Request, didCreateInitialURLRequest urlRequest: URLRequest) {
-        print("\(prefixString) Initial Create URLRequest: \(urlRequest.url?.absoluteString ?? "None")")
-    }
+//    public func request(_ request: Request, didCreateInitialURLRequest urlRequest: URLRequest) {
+//        print("\(prefixString) Initial Create URLRequest: \(urlRequest.url?.absoluteString ?? "None")")
+//    }
     
     public func request(_ request: Request, didFailToCreateURLRequestWithError error: Error) {
-        print("\(prefixString) Request: \(request) didFailToCreateURLRequestWithError: \(error)")
+        if EnabledLog {
+            print("\(prefixString) Request: \(request) didFailToCreateURLRequestWithError: \(error)")
+        }
     }
     
     public func request(_ request: Request, didAdaptInitialRequest initialRequest: URLRequest, to adaptedRequest: URLRequest) {
-        if initialRequest != adaptedRequest {
+        if EnabledLog && initialRequest != adaptedRequest {
             print("\(prefixString) Request: \(request) didAdaptInitialRequest \(initialRequest) to \(adaptedRequest)")
         }
     }
     
     public func request(_ request: Request, didFailToAdaptURLRequest initialRequest: URLRequest, withError error: Error) {
-        print("\(prefixString) Request: \(request) didFailToAdaptURLRequest \(initialRequest) withError \(error)")
+        if EnabledLog {
+            print("\(prefixString) Request: \(request) didFailToAdaptURLRequest \(initialRequest) withError \(error)")
+        }
     }
     
 //    public func request(_ request: Request, didCreateURLRequest urlRequest: URLRequest) {
@@ -113,25 +127,33 @@ open class MNNetworkLogger: EventMonitor {
 //    public func request(_ request: Request, didCreateTask task: URLSessionTask) {
 //        print("\(prefixString) Request: \(request) didCreateTask \(task)")
 //    }
-    
-    public func request(_ request: Request, didGatherMetrics metrics: URLSessionTaskMetrics) {
+//    
+//    public func request(_ request: Request, didGatherMetrics metrics: URLSessionTaskMetrics) {
 //        print("\(prefixString) Request: \(request) didGatherMetrics \(metrics)")
-    }
+//    }
     
     public func request(_ request: Request, didFailTask task: URLSessionTask, earlyWithError error: Error) {
-        print("\(prefixString) Request: \(request) didFailTask \(task) earlyWithError \(error)")
+        if EnabledLog {
+            print("\(prefixString) Request: \(request) didFailTask \(task) earlyWithError \(error)")
+        }
     }
     
     public func request(_ request: Request, didCompleteTask task: URLSessionTask, with error: Error?) {
-        print("\(prefixString) Request: \(request) didCompleteTask \(task) withError: \(error?.localizedDescription ?? "None")")
+        if EnabledLog {
+            print("\(prefixString) Request: \(request) didCompleteTask \(task) withError: \(error?.localizedDescription ?? "None")")
+        }
     }
     
-    public func requestDidFinish(_ request: Request) {
-        print("\(prefixString) Request didFinish: \(request)")
-    }
+//    public func requestDidFinish(_ request: Request) {
+//        if EnabledLog {
+//            print("\(prefixString) Request didFinish: \(request)")
+//        }
+//    }
     
     public func requestDidResume(_ request: Request) {
-        print("\(prefixString) Request didResume: \(request)")
+        if EnabledLog {
+            print("\(prefixString) Request didResume: \(request)")
+        }
     }
     
 //    public func request(_ request: Request, didResumeTask task: URLSessionTask) {
@@ -139,19 +161,27 @@ open class MNNetworkLogger: EventMonitor {
 //    }
     
     public func requestDidSuspend(_ request: Request) {
-        print("\(prefixString) Request didSuspend: \(request)")
+        if EnabledLog {
+            print("\(prefixString) Request didSuspend: \(request)")
+        }
     }
     
     public func request(_ request: Request, didSuspendTask task: URLSessionTask) {
-        print("\(prefixString) Request: \(request) didSuspendTask: \(task)")
+        if EnabledLog {
+            print("\(prefixString) Request: \(request) didSuspendTask: \(task)")
+        }
     }
     
     public func requestDidCancel(_ request: Request) {
-        print("\(prefixString) Request didCancel: \(request)")
+        if EnabledLog {
+            print("\(prefixString) Request didCancel: \(request)")
+        }
     }
     
     public func request(_ request: Request, didCancelTask task: URLSessionTask) {
-        print("\(prefixString) Request: \(request) didCancelTask: \(task)")
+        if EnabledLog {
+            print("\(prefixString) Request: \(request) didCancelTask: \(task)")
+        }
     }
     
 //    public func request(_ request: DataRequest, didParseResponse response: DataResponse<Data?, Error>) {
@@ -171,7 +201,9 @@ open class MNNetworkLogger: EventMonitor {
 //    }
     
     public func requestIsRetrying(_ request: Request) {
-        print("\(prefixString) Request isRetrying: \(request)")
+        if EnabledLog {
+            print("\(prefixString) Request isRetrying: \(request)")
+        }
     }
     
 //    public func request(_ request: DataRequest, didValidateRequest urlRequest: URLRequest?, response: HTTPURLResponse, data: Data?, withResult result: Request.ValidationResult) {
@@ -179,19 +211,27 @@ open class MNNetworkLogger: EventMonitor {
 //    }
     
     public func request(_ request: DataStreamRequest, didValidateRequest urlRequest: URLRequest?, response: HTTPURLResponse, withResult result: Request.ValidationResult) {
-        print("\(prefixString) Request: \(request), didValidateRequestWithResult: \(result)")
+        if EnabledLog {
+            print("\(prefixString) Request: \(request), didValidateRequestWithResult: \(result)")
+        }
     }
     
     public func request<Value>(_ request: DataStreamRequest, didParseStream result: Result<Value, AFError>) {
-        print("\(prefixString) Request: \(request), didParseStreamWithResult: \(result)")
+        if EnabledLog {
+            print("\(prefixString) Request: \(request), didParseStreamWithResult: \(result)")
+        }
     }
     
     public func request(_ request: UploadRequest, didCreateUploadable uploadable: UploadRequest.Uploadable) {
-        print("\(prefixString) Request: \(request), didCreateUploadable: \(uploadable)")
+        if EnabledLog {
+            print("\(prefixString) Request: \(request), didCreateUploadable: \(uploadable)")
+        }
     }
     
     public func request(_ request: UploadRequest, didFailToCreateUploadableWithError error: Error) {
-        print("\(prefixString) Request: \(request), didFailToCreateUploadableWithError: \(error)")
+        if EnabledLog {
+            print("\(prefixString) Request: \(request), didFailToCreateUploadableWithError: \(error)")
+        }
     }
     
 //    public func request(_ request: UploadRequest, didProvideInputStream stream: InputStream) {
@@ -199,7 +239,9 @@ open class MNNetworkLogger: EventMonitor {
 //    }
     
     public func request(_ request: DownloadRequest, didFinishDownloadingUsing task: URLSessionTask, with result: Result<URL, Error>) {
-        print("\(prefixString) Request: \(request), didFinishDownloadingUsing: \(task), withResult: \(result)")
+        if EnabledLog {
+            print("\(prefixString) Request: \(request), didFinishDownloadingUsing: \(task), withResult: \(result)")
+        }
     }
     
 //    public func request(_ request: DownloadRequest, didCreateDestinationURL url: URL) {
@@ -207,7 +249,9 @@ open class MNNetworkLogger: EventMonitor {
 //    }
     
     public func request(_ request: DownloadRequest, didValidateRequest urlRequest: URLRequest?, response: HTTPURLResponse, temporaryURL: URL?, destinationURL: URL?, withResult result: Request.ValidationResult) {
-        print("\(prefixString) Request: \(request), didValidateRequestWithResult: \(result)")
+        if EnabledLog {
+            print("\(prefixString) Request: \(request), didValidateRequestWithResult: \(result)")
+        }
     }
 }
 
@@ -217,6 +261,10 @@ extension Request {
     ///
     /// - Returns: The cURL equivalent of the instance.
     public func cURLString() -> String {
+        if EnabledLog == false {
+            return ""
+        }
+        
         guard
             let request = lastRequest,
             let url = request.url,
@@ -274,39 +322,56 @@ extension Request {
         }
 
         if let httpBodyData = request.httpBody {
-            let httpBody = String(decoding: httpBodyData, as: UTF8.self)
-            var escapedBody = httpBody.replacingOccurrences(of: "\\\"", with: "\\\\\"")
-            escapedBody = escapedBody.replacingOccurrences(of: "\"", with: "\\\"")
+            if let json = try? JSONSerialization.jsonObject(with: httpBodyData, options: []),
+               let jsonString = jsonFrom(object: json) {
+                components.append("-d \"\(jsonString)\"")
+            }
+            else {
+                let httpBody = String(decoding: httpBodyData, as: UTF8.self)
+                var escapedBody = httpBody.replacingOccurrences(of: "\\\"", with: "\\\\\"")
+                escapedBody = escapedBody.replacingOccurrences(of: "\"", with: "\\\"")
 
-            components.append("-d \"\(escapedBody)\"")
+                components.append("-d \"\(escapedBody)\"")
+            }
         }
 
         return components.joined(separator: " \\\n\t")
     }
     
     public func printLog<T>(for response: AFDataResponse<T>, cURL: String) {
+        printLog(for: response.response, metrics: response.metrics, result: response.result, data: response.data, cURL: cURL)
+    }
+    
+    public func printLog<T>(for response: AFDownloadResponse<T>, cURL: String) {
+        printLog(for: response.response, metrics: response.metrics, result: response.result, cURL: cURL)
+    }
+    
+    private func printLog<Success, Failure>(for response: HTTPURLResponse?, metrics: URLSessionTaskMetrics?, result: Result<Success, Failure>, data: Data? = nil, cURL: String) {
+        if EnabledLog == false {
+            return
+        }
         #if DEBUG
-        DispatchQueue.global().async {
+        MNNetworkLogger.shared.queue.async {
             var logStrs: [String] = [ "🙏 request with cURL: \n\(cURL)"]
             defer {
                 print(logStrs.joined(separator: "\n"))
             }
-            let statusCode = response.response?.statusCode ?? 0
-            if let start = response.metrics?.taskInterval.start, let duration = response.metrics?.taskInterval.duration {
+            let statusCode = response?.statusCode ?? 0
+            if let start = metrics?.taskInterval.start, let duration = metrics?.taskInterval.duration {
                 logStrs.append("start \(start)")
                 logStrs.append("duration \(String(format: "%.3f", duration))s")
             }
-            logStrs.append("response header: \((response.response?.allHeaderFields as? [String: Any])?.toJsonString(prettyPrinted: false) ?? "")")
+            logStrs.append("response header: \((self.jsonFrom(object: response?.allHeaderFields, prettyPrinted: false) ?? ""))")
             var statusEmoji = "🤔"
             if statusCode > 199 && statusCode < 300 { statusEmoji = "😁" }
             else if statusCode > 399 && statusCode < 500 { statusEmoji = "☹️" }
             logStrs.append("\(statusEmoji) status code: \(statusCode)")
             var dataDebug: String!
-            switch response.result {
+            switch result {
             case .success(let data as Any):
                 dataDebug = "data:\n"
                 if let data = data as? [String: Any] {
-                    dataDebug += data.toJsonString()
+                    dataDebug += (self.jsonFrom(object: data) ?? "")
                 }
                 else if let data = data as? String {
                     dataDebug += data
@@ -314,27 +379,36 @@ extension Request {
                 else if let data = data as? Data, let str = String(data: data, encoding: .utf8) {
                     dataDebug += str
                 }
+                else if let fileURL = data as? URL {
+                    dataDebug += fileURL.absoluteString
+                }
                 else {
                     dataDebug += "\(data)"
                 }
                 logStrs.append(dataDebug)
-                break
             case .failure(let error):
                 logStrs.append("Error: \(error)")
-                break
+                if let data = data, let str = String(data: data, encoding: .utf8) {
+                    logStrs.append("data: \(str)")
+                }
             }
         }
         #endif
     }
-}
-
-extension Dictionary where Key == String {
-    func toJsonString(prettyPrinted: Bool = true) -> String {
-        if let stringData = try? JSONSerialization.data(withJSONObject: self, options: prettyPrinted ? .prettyPrinted : []) {
+    
+    private func jsonFrom(object: Any?, prettyPrinted: Bool = true) -> String? {
+        if let object = object,
+            let stringData = try? JSONSerialization.data(withJSONObject: object, options: prettyPrinted ? .prettyPrinted : []) {
             if let string = String(data: stringData, encoding: .utf8) {
+                if prettyPrinted && string.count > 1000 {
+                    var result = jsonFrom(object: object, prettyPrinted: false)
+                    result = result?.replacingOccurrences(of: "{", with: " {")
+                    result = result?.replacingOccurrences(of: "[", with: " [")
+                    return result?.trimmingCharacters(in: .whitespaces)
+                }
                 return string
             }
         }
-        return ""
+        return nil
     }
 }

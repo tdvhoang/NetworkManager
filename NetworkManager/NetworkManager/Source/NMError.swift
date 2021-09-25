@@ -7,46 +7,57 @@
 //
 
 import Foundation
+import ObjectMapper
 
-public struct NMError: Codable, Error {
+struct NMErrorContext: MapContext {
+    let statusCode: Int?
+}
+
+public struct NMError: Mappable, Error {
+    public var code: Int?
+    public var message: String?
+    public var json: [String: Any]?
     
-    public var code: String
-    public var message: String
+    //Debug
+    public var param: String?
+    public var value: String?
+    public var location: String?
+    
+    public init?(map: Map) { }
+    
+    public mutating func mapping(map: Map) {
+        self.code <- map["code"]
+        self.message <- map["msg"]
+        self.param <- map["param"]
+        self.value <- map["value"]
+        self.location <- map["location"]
+        self.json = map.JSON
+        
+        //Correction
+        self.code = self.code ?? (map.context as? NMErrorContext)?.statusCode
+        self.code = self.code ?? (map.context as? NMResultDataContext)?.statusCode
+    }
     
     public init(err: Error) {
-        self.code = "\((err as NSError).code)"
+        self.code = (err as NSError).code
         self.message = err.localizedDescription
     }
     
-    public init(code: String = "\(#file).\(#function).\(#line)", message: String) {
+    public init(code: Int = 0, message: String = "") {
         self.code = code
         self.message = message
     }
     
-    public init(code: Int) {
-        self.code = "\(code)"
-        self.message = ""
-    }
-    
-//    public mutating func mapping(map: Map) {
-//        if let code = [map.JSON["code"], map.JSON["Code"], map.JSON["errorCode"]].compactMap({ $0 }).first as? String {
-//            self.code = code
-//        }
-//        if let mess = [map.JSON["field"], map.JSON["message"], map.JSON["Message"], map.JSON["errorMessage"]].compactMap({ $0 }).first as? String {
-//            self.message = mess
-//        }
-//    }
-    
     public func asNSError() -> NSError {
-        return NSError(domain: self.message, code: Int(self.code) ?? 0, userInfo: ["codeString": self.code])
+        return NSError(domain: self.message ?? "", code: self.code ?? 0, userInfo: nil)
     }
 }
 
 public extension Array where Element == NMError {
     func getAnError() -> NSError? {
         for anError in self {
-            if let errorCode = Int(anError.code) {
-                return NSError(domain: anError.message, code: errorCode, userInfo: nil)
+            if let errorCode = anError.code {
+                return NSError(domain: anError.message ?? "", code: errorCode, userInfo: nil)
             }
         }
         if let first = self.first {

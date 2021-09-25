@@ -1,8 +1,8 @@
 # Variables
-$iOSDeploymentTarget = '10.0'
+iOSDeploymentTarget = '10.0'
 
 # Settings
-platform :ios, $iOSDeploymentTarget
+platform :ios, iOSDeploymentTarget
 inhibit_all_warnings!
 
 # Common Pods
@@ -28,7 +28,7 @@ end
 post_install do |pi|
    pi.pods_project.targets.each do |t|
        t.build_configurations.each do |bc|
-         bc.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = $iOSDeploymentTarget
+         bc.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = iOSDeploymentTarget
        end
    end
 end

@@ -9,8 +9,36 @@
 import Alamofire
 import ObjectMapper
 
-public typealias NMResult = (_ result: Result<NMResultData, NMResultData>) -> Void
-public typealias NMProgressBlock = (_ percent: Double, _ objectToUpload: Any) -> Void
+typealias NetworkBoolCompletion = (NMResult<Bool?, NetworkManagerFailedData>) -> Void
+typealias NetworkStringCompletion = (NMResult<String?, NetworkManagerFailedData>) -> Void
+typealias NetworkAnyCompletion = (NMResult<Any?, NetworkManagerFailedData>) -> Void
+typealias NetworkURLCompletion = (NMResult<URL?, NetworkManagerFailedData>) -> Void
+typealias NetworkRawDataCompletion = (NMResult<NetworkManagerSuccessData, NetworkManagerFailedData>) -> Void
+
+typealias NetworkArrayCompletion<T> = (NMResult<[T]?, NetworkManagerFailedData>) -> Void
+typealias NetworkObjectCompletion<T> = (NMResult<T?, NetworkManagerFailedData>) -> Void
+typealias NetworkPagingCompletion<T: BaseMappable> = (NMResult<NMPagingResult<T>?, NetworkManagerFailedData>) -> Void
+
+struct NMPagingResult<T: BaseMappable> {
+    public var data: [T]?
+    public var paging: NetworkManagerPagingData?
+    
+    init(result: NetworkManagerSuccessData) {
+        self.data = Mapper<T>().mapArray(JSONObject: result.data)
+        self.paging = result.paging
+    }
+}
+
+public enum NMResult<Success, Failure> {
+    case success(Success)
+    case failure(Failure)
+}
+
+public typealias NMResultBlock = (_ result: NMResult<NetworkManagerSuccessData, NetworkManagerFailedData>) -> Void
+public typealias NMDownloadResultBlock = (_ result: NMResult<URL?, Error>) -> Void
+
+/// objectUsedToUpload maybe UIImage/String/URL
+public typealias NMProgressBlock = (_ percent: Double, _ objectUsedToUpload: Any?) -> Void
 
 public protocol NMParameters { }
 public extension NMParameters {

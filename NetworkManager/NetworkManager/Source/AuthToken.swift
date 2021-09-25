@@ -6,12 +6,39 @@
 //  Copyright © 2020 Hoang Tran. All rights reserved.
 //
 
-public struct AuthToken: Codable {
+public struct AuthToken: Mappable {
     public var accessToken: String
-    public var refreshToken: String
+    public var refreshToken: String?
     public var expiresIn: Double?
     public var oldToken: String?
     private var createdAt: Date?
+    
+    public init(access: String, refresh: String? = nil) {
+        accessToken = access
+        refreshToken = refresh
+        
+        //Correction
+        createdAt = Date()
+        expiresIn = getExpiredDateFromAccessToken()?.timeIntervalSince1970
+    }
+    
+    public init?(map: Map) {
+        do {
+            accessToken = try map.value("accessToken")
+            refreshToken = try? map.value("refreshToken")
+        }
+        catch {
+            return nil
+        }
+    }
+    
+    public mutating func mapping(map: Map) {
+        //Correction
+        if map.mappingType == .fromJSON {
+            createdAt = createdAt ?? Date()
+            expiresIn = expiresIn ?? getExpiredDateFromAccessToken()?.timeIntervalSince1970
+        }
+    }
     
     public func tockenExpiredDate() -> Date? {
         if let createdAt = self.createdAt, let expiredIn = self.expiresIn {
@@ -35,6 +62,7 @@ public extension AuthToken {
             return nil
         }
         let segments = tokenStr.components(separatedBy: ".")
+        if segments.count < 2 { return nil }
         var base64String = segments[1]
         let requiredLength = Int(4 * ceil(Float(base64String.count) / 4.0))
         let nbrPaddings = requiredLength - base64String.count
@@ -65,17 +93,17 @@ public extension AuthToken {
         return nil
     }
     
-    func getOrganizationIDFromAccessToken() -> String? {
-        if let dict = self.getJwtDict() {
-            return dict["organization_id"] as? String
-        }
-        return nil
-    }
-    
     func getExpiredDateFromAccessToken() -> Date? {
         if let dict = self.getJwtDict(),
             let timeInterval = dict["exp"] as? Double {
             return Date(timeIntervalSince1970: timeInterval)
+        }
+        return nil
+    }
+    
+    func getUserIdFromAccessToken() -> Int? {
+        if let dict = self.getJwtDict() {
+            return dict["userId"] as? Int
         }
         return nil
     }
